@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: Usage Service API
+  version: 1.0.3
+  description: Internal API for usage event ingestion and querying usage events.
+
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/uni-893/usage/1.0.3
+  - url: /internal/usage
+
+tags:
+  - name: Events
+
+components:
+  securitySchemes:
+    InternalServiceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    FromDateTime:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    ToDateTime:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: USAGE_ERROR
+            message:
+              type: string
+              example: Failed to record usage event.
+            details:
+              type: object
+              additionalProperties: true
+
+    UsageEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - eventId
+        - userId
+        - conversationId
+        - providerId
+        - modelId
+        - promptTokens
+        - completionTokens
+        - totalTokens
+        - cost
+        - currency
+        - latencyMs
+        - timestamp
+      properties:
+        eventId:
+          type: string
+          example: evt_123
+        requestId:
+          type: string
+          nullable: true
+          example: req_123
+        userId:
+          type: string
+          example: user_123
+        conversationId:
+          type: string
+          example: conv_1
+        providerId:
+          type: string
+          example: openai
+        modelId:
+          type: string
+          example: gpt-4.1
+        promptTokens:
+          type: integer
+          example: 120
+        completionTokens:
+          type: integer
+          example: 200
+        totalTokens:
+          type: integer
+          example: 320
+        cost:
+          type: number
+          format: double
+          example: 0.0123
+        currency:
+          type: string
+          example: EUR
+        latencyMs:
+          type: integer
+          example: 900
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-01-01T12:00:01Z"
+
+    RecordEventResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, eventId]
+      properties:
+        accepted:
+          type: boolean
+          example: true
+        eventId:
+          type: string
+          example: evt_123
+        deduplicated:
+          type: boolean
+          nullable: true
+          description: True if an event with the same eventId already existed.
+
+    UsageEventSummaryItem:
+      type: object
+      additionalProperties: false
+      required: [eventId, userId, providerId, modelId, tokens, cost, timestamp]
+      properties:
+        eventId:
+          type: string
+          example: evt_123
+        userId:
+          type: string
+          example: user_123
+        providerId:
+          type: string
+          example: openai
+        modelId:
+          type: string
+          example: gpt-4.1
+        tokens:
+          type: integer
+          example: 340
+        cost:
+          type: number
+          format: double
+          example: 0.014
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-01-01T12:00:01Z"
+
+    ListEventsResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageEventSummaryItem'
+        total:
+          type: integer
+          nullable: true
+        nextCursor:
+          type: string
+          nullable: true
+
+security:
+  - InternalServiceToken: []
+
+paths:
+  /events:
+    post:
+      tags: [Events]
+      summary: Record single usage event (idempotent by eventId)
+      operationId: recordUsageEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageEvent'
+      responses:
+        '202':
+          description: Accepted (may be async processed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordEventResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Events]
+      summary: Get all recorded events (with optional time range)
+      operationId: listUsageEvents
+      parameters:
+        - $ref: '#/components/parameters/FromDateTime'
+        - $ref: '#/components/parameters/ToDateTime'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEventsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      summary: Get a specific event
+      operationId: getUsageEvent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Event detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageEvent'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
