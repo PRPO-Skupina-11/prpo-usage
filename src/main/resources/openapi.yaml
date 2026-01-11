@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
   title: Usage Service API
-  version: 1.0.3
+  version: 1.0.4
   description: Internal API for usage event ingestion and querying usage events.
 
 servers:
   # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/uni-893/usage/1.0.3
+    url: https://virtserver.swaggerhub.com/uni-893/usage/1.0.4
   - url: /internal/usage
 
 tags:
@@ -119,7 +119,7 @@ components:
           example: 320
         cost:
           type: number
-          format: double
+          format: decimal
           example: 0.0123
         currency:
           type: string
@@ -170,7 +170,7 @@ components:
           example: 340
         cost:
           type: number
-          format: double
+          format: decimal
           example: 0.014
         timestamp:
           type: string
